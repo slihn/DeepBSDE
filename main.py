@@ -12,23 +12,36 @@ from config import get_config
 from equation import get_equation
 from solver import FeedForwardModel
 
+class OptDef:
+    problem_name = 'HJB'
+    log_dir = './logs'
+    num_run = 1
+
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('problem_name', 'HJB',
+tf.app.flags.DEFINE_string('problem_name', OptDef.problem_name,
                            """The name of partial differential equation.""")
-tf.app.flags.DEFINE_integer('num_run', 1,
+tf.app.flags.DEFINE_integer('num_run', OptDef.num_run,
                             """The number of experiments to repeatedly run for the same problem.""")
-tf.app.flags.DEFINE_string('log_dir', './logs',
+tf.app.flags.DEFINE_string('log_dir', OptDef.log_dir,
                            """Directory where to write event logs and output array.""")
 
 
 def main():
     problem_name = FLAGS.problem_name
+    log_dir = FLAGS.log_dir
+    num_run = FLAGS.num_run
+    main2(problem_name, log_dir, num_run)
+
+
+def main2(problem_name=OptDef.problem_name, num_run=OptDef.num_run, log_dir=OptDef.log_dir):
     config = get_config(problem_name)
     bsde = get_equation(problem_name, config.dim, config.total_time, config.num_time_interval)
 
-    if not os.path.exists(FLAGS.log_dir):
-        os.mkdir(FLAGS.log_dir)
-    path_prefix = os.path.join(FLAGS.log_dir, problem_name)
+    if not os.path.exists(log_dir):
+        os.mkdir(log_dir)
+    path_prefix = os.path.join(log_dir, problem_name)
+
+    # save config to file
     with open('{}_config.json'.format(path_prefix), 'w') as outfile:
         json.dump(dict((name, getattr(config, name))
                        for name in dir(config) if not name.startswith('__')),
@@ -36,7 +49,7 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(levelname)-6s %(message)s')
 
-    for idx_run in range(1, FLAGS.num_run+1):
+    for idx_run in range(1, num_run+1):
         tf.reset_default_graph()
         with tf.Session() as sess:
             logging.info('Begin to solve %s with run %d' % (problem_name, idx_run))
@@ -58,4 +71,6 @@ def main():
                        comments='')
 
 if __name__ == '__main__':
-    main()
+    # main()
+    # main2("HJB")  # Y0 ~ 4.59, loss ~ 2e-2
+    main2("AllenCahn")  # Y0 ~ 5.3e-2, loss ~ 6e-5
