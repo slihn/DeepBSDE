@@ -3,6 +3,9 @@ import time
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.training import moving_averages
+from equation import Equation
+from config import Config
+
 
 TF_DTYPE = tf.float64
 MOMENTUM = 0.99
@@ -10,9 +13,16 @@ EPSILON = 1e-6
 DELTA_CLIP = 50.0
 
 
+xrange = range  # 2.0 migrated to 3.0
+
+
+def rsum(x):
+    return tf.reduce_sum(x, 1, keepdims=True)
+
+
 class FeedForwardModel(object):
     """The fully connected neural network model."""
-    def __init__(self, config, bsde, sess):
+    def __init__(self, config: Config, bsde: Equation, sess: tf.Session):
         self._config = config
         self._bsde = bsde
         self._sess = sess
@@ -22,6 +32,14 @@ class FeedForwardModel(object):
         self._total_time = bsde.total_time
         # ops for statistics update of batch normalization
         self._extra_train_ops = []
+
+        self._dw = None
+        self._x = None
+        self._is_training = None
+        self._y_init = None
+        self._loss = None
+        self._train_ops = None
+        self._t_build = None
 
     def train(self):
         start_time = time.time()
@@ -66,14 +84,12 @@ class FeedForwardModel(object):
         z = tf.matmul(all_one_vec, z_init)
         with tf.variable_scope('forward'):
             for t in xrange(0, self._num_time_interval-1):
-                y = y - self._bsde.delta_t * (
-                    self._bsde.f_tf(time_stamp[t], self._x[:, :, t], y, z)
-                ) + tf.reduce_sum(z * self._dw[:, :, t], 1, keep_dims=True)
+                f = self._bsde.f_tf(time_stamp[t], self._x[:, :, t], y, z)
+                y = y - self._bsde.delta_t * f + rsum(z * self._dw[:, :, t])
                 z = self._subnetwork(self._x[:, :, t + 1], str(t + 1)) / self._dim
             # terminal time
-            y = y - self._bsde.delta_t * self._bsde.f_tf(
-                time_stamp[-1], self._x[:, :, -2], y, z
-            ) + tf.reduce_sum(z * self._dw[:, :, -1], 1, keep_dims=True)
+            f = self._bsde.f_tf(time_stamp[-1], self._x[:, :, -2], y, z)
+            y = y - self._bsde.delta_t * f + rsum(z * self._dw[:, :, -1])
             delta = y - self._bsde.g_tf(self._total_time, self._x[:, :, -1])
             # use linear approximation outside the clipped range
             self._loss = tf.reduce_mean(tf.where(tf.abs(delta) < DELTA_CLIP, tf.square(delta),
