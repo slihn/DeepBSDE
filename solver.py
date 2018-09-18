@@ -52,6 +52,7 @@ class FeedForwardModel(object):
         feed_dict_valid = {self._dw: dw_valid, self._x: x_valid, self._is_training: False}
         # initialization
         self._sess.run(tf.global_variables_initializer())
+
         # begin sgd iteration
         for step in xrange(self._config.num_iterations+1):
             if step % self._config.logging_frequency == 0:
@@ -69,29 +70,41 @@ class FeedForwardModel(object):
 
     def build(self):
         start_time = time.time()
+        # time steps, t_i, i = 0..n-1
         time_stamp = np.arange(0, self._bsde.num_time_interval) * self._bsde.delta_t
+
+        # dw has the same steps as t_i, its first dimension is the m (realization)
+        # x has one more step than dw and t_i
+        # placeholders need to be fed by feed_dict
         self._dw = tf.placeholder(TF_DTYPE, [None, self._dim, self._num_time_interval], name='dW')
         self._x = tf.placeholder(TF_DTYPE, [None, self._dim, self._num_time_interval + 1], name='X')
         self._is_training = tf.placeholder(tf.bool)
+
+        # y_init is a single value variable
         self._y_init = tf.Variable(tf.random_uniform([1],
                                                      minval=self._config.y_init_range[0],
                                                      maxval=self._config.y_init_range[1],
                                                      dtype=TF_DTYPE))
+
         z_init = tf.Variable(tf.random_uniform([1, self._dim],
                                                minval=-.1, maxval=.1,
                                                dtype=TF_DTYPE))
+
         all_one_vec = tf.ones(shape=tf.stack([tf.shape(self._dw)[0], 1]), dtype=TF_DTYPE)
-        y = all_one_vec * self._y_init
-        z = tf.matmul(all_one_vec, z_init)
+        y = all_one_vec * self._y_init  # Y(t=0)
+        z = tf.matmul(all_one_vec, z_init)  # Z(t=0)
+
         with tf.variable_scope('forward'):
-            for t in xrange(0, self._num_time_interval-1):
-                f = self._bsde.f_tf(time_stamp[t], self._x[:, :, t], y, z)
-                y = y - self._bsde.delta_t * f + rsum(z * self._dw[:, :, t])
-                z = self._subnetwork(self._x[:, :, t + 1], str(t + 1)) / self._dim
+            for i in xrange(0, self._num_time_interval-1):
+                f = self._bsde.f_tf(time_stamp[i], self._x[:, :, i], y, z)
+                y = y - self._bsde.delta_t * f + rsum(z * self._dw[:, :, i])
+                z = self._subnetwork(self._x[:, :, i + 1], str(i + 1)) / self._dim
+
             # terminal time
             f = self._bsde.f_tf(time_stamp[-1], self._x[:, :, -2], y, z)
             y = y - self._bsde.delta_t * f + rsum(z * self._dw[:, :, -1])
             delta = y - self._bsde.g_tf(self._total_time, self._x[:, :, -1])
+
             # use linear approximation outside the clipped range
             self._loss = tf.reduce_mean(tf.where(tf.abs(delta) < DELTA_CLIP, tf.square(delta),
                                                  2 * DELTA_CLIP * tf.abs(delta) - DELTA_CLIP ** 2))
@@ -112,6 +125,7 @@ class FeedForwardModel(object):
         self._t_build = time.time()-start_time
 
     def _subnetwork(self, x, name):
+        # builds sub-network that connects X to Z
         with tf.variable_scope(name):
             # standardize the path input first
             # the affine  could be redundant, but helps converge faster
@@ -127,10 +141,12 @@ class FeedForwardModel(object):
                                              name='final_layer')
         return output
 
-    def _dense_batch_layer(self, input_, output_size, activation_fn=None,
+    def _dense_batch_layer(self, input_, output_size,
+                           activation_fn=None,
                            stddev=5.0, name='linear'):
+        # construct one layer of output = fn(bn(w * input))
         with tf.variable_scope(name):
-            shape = input_.get_shape().as_list()
+            shape = input_.get_shape().as_list()  # shape[1] is _dim / previous output size
             weight = tf.get_variable('Matrix', [shape[1], output_size], TF_DTYPE,
                                      tf.random_normal_initializer(
                                          stddev=stddev/np.sqrt(shape[1]+output_size)))
@@ -141,10 +157,10 @@ class FeedForwardModel(object):
         else:
             return hiddens_bn
 
-    def _batch_norm(self, x, affine=True, name='batch_norm'):
+    def _batch_norm(self, x, name='batch_norm'):
         """Batch normalization"""
         with tf.variable_scope(name):
-            params_shape = [x.get_shape()[-1]]
+            params_shape = [x.get_shape()[-1]]  # -1 removes time dimension
             beta = tf.get_variable('beta', params_shape, TF_DTYPE,
                                    initializer=tf.random_normal_initializer(
                                        0.0, stddev=0.1, dtype=TF_DTYPE))

@@ -3,13 +3,20 @@ import numpy as np
 
 class Config(object):
     n_layer = 4
-    batch_size = 64
-    valid_size = 256
+    batch_size = 64  # num_sample
+    valid_size = 256  # num_sample
+
     step_boundaries = [2000, 4000]
     num_iterations = 6000
     logging_frequency = 100
     verbose = True
     y_init_range = [0, 1]
+
+    # to be defined by children
+    # https://www.tensorflow.org/api_docs/python/tf/train/piecewise_constant
+    lr_values = None  # learning rate values
+    lr_boundaries = None  # learning rate boundaries
+    num_hiddens = None
 
 
 class AllenCahnConfig(Config):
@@ -28,9 +35,9 @@ class HJBConfig(Config):
     dim = 100
     total_time = 1.0
     num_time_interval = 20  # increases from 20 to 100 for better precision?
+    lr_values = list(np.array([1e-2, 1e-2]))
     lr_boundaries = [400]
     num_iterations = 4000
-    lr_values = list(np.array([1e-2, 1e-2]))
     num_hiddens = [dim, dim+10, dim+10, dim]
     y_init_range = [0, 1]
 
