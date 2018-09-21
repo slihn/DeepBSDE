@@ -15,7 +15,11 @@ class Equation(object):
         self._num_time_interval = num_time_interval
         self._delta_t = (self._total_time + 0.0) / self._num_time_interval
         self._sqrt_delta_t = np.sqrt(self._delta_t)
+
         self._y_init = None
+        self._x_init = np.zeros(self._dim)
+        self._sigma = np.sqrt(2.0)
+        self._lambda = 1.0
 
     def sample(self, num_sample):
         """Sample forward SDE."""
@@ -49,6 +53,21 @@ class Equation(object):
     def delta_t(self):
         return self._delta_t
 
+    def dw_sample_normal(self, num_sample):
+        dw_sample = normal.rvs(size=[num_sample,
+                                     self._dim,
+                                     self._num_time_interval]) * self._sqrt_delta_t
+        return dw_sample
+
+    def x_sample_bm(self, num_sample, dw_sample):
+        # X(t) = vectorize(self._x_init)
+        # X(t+1) = X(t) + simga * dW(t), see Section 5.4 of [1]
+        x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
+        x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
+        for i in xrange(self._num_time_interval):
+            x_sample[:, :, i + 1] = x_sample[:, :, i] + self._sigma * dw_sample[:, :, i]
+        return x_sample
+
 
 def get_equation(name, dim, total_time, num_time_interval):
     try:
@@ -64,24 +83,17 @@ def rsum(x):
 class AllenCahn(Equation):
     def __init__(self, dim, total_time, num_time_interval):
         super(AllenCahn, self).__init__(dim, total_time, num_time_interval)
-        self._x_init = np.zeros(self._dim)
-        self._sigma = np.sqrt(2.0)
 
     def sample(self, num_sample):
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
-        x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
-        x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
-        for i in xrange(self._num_time_interval):
-            x_sample[:, :, i + 1] = x_sample[:, :, i] + self._sigma * dw_sample[:, :, i]
+        dw_sample = self.dw_sample_normal(num_sample)
+        x_sample = self.x_sample_bm(num_sample, dw_sample)
         return dw_sample, x_sample
 
     def f_tf(self, t, x, y, z):
-        return y - tf.pow(y, 3)
+        return y - tf.pow(y, 3)  # Section 4.2, page 12 of [1]
 
     def g_tf(self, t, x):
-        return 0.5 / (1 + 0.2 * tf.reduce_sum(tf.square(x), 1, keepdims=True))
+        return 0.5 / (1 + 0.2 * rsum(tf.square(x)))  # Section 4.2, page 12 of [1]
 
 
 class HJB(Equation):
@@ -93,9 +105,7 @@ class HJB(Equation):
 
     def sample(self, num_sample):
         # dw is multivariate normal
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
+        dw_sample = self.dw_sample_normal(num_sample)
 
         x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])  # initialize to 0
         x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init  # set t=0

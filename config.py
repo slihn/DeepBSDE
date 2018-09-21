@@ -1,9 +1,12 @@
 import numpy as np
 
 
+# main reference:
+#    [1] https://arxiv.org/abs/1706.04702
+#    [2] https://arxiv.org/abs/1707.02568
 class Config(object):
-    n_layer = 4
-    batch_size = 64  # num_sample
+    n_layer = 4  # see page 10-11 of [1]
+    batch_size = 64  # num_sample, this is j in page 10 of [1]
     valid_size = 256  # num_sample
 
     step_boundaries = [2000, 4000]
@@ -20,17 +23,19 @@ class Config(object):
 
 
 class AllenCahnConfig(Config):
-    total_time = 0.3
-    num_time_interval = 20
-    dim = 100
-    lr_values = list(np.array([5e-4, 5e-4]))
+    # according to Section 4.2 of [1]
+    total_time = 0.3  # this is T in [1]
+    num_time_interval = 20  # this is n in [1]
+    dim = 100  # this is d in [1]
+    lr_values = list(np.array([5e-4, 5e-4]))  # this is gamma_m in [1]
     lr_boundaries = [2000]
-    num_iterations = 6000
-    num_hiddens = [dim, dim + 10, dim + 10, dim]
+    num_iterations = 6000  # this is m in [1]
+    num_hiddens = [dim, dim + 10, dim + 10, dim]  # see page 10 of [1]
     y_init_range = [0.3, 0.6]
 
 
 class HJBConfig(Config):
+    # according to Section 4.3 of [1]
     # Y_0 is about 4.5901.
     dim = 100
     total_time = 1.0
