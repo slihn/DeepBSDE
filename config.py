@@ -48,6 +48,7 @@ class HJBConfig(Config):
 
 
 class PricingOptionConfig(Config):
+    # according to Section 4.4 of [1]
     dim = 100
     total_time = 0.5
     num_time_interval = 20

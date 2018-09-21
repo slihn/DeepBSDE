@@ -72,5 +72,7 @@ def main2(problem_name=OptDef.problem_name, num_run=OptDef.num_run, log_dir=OptD
 
 if __name__ == '__main__':
     # main()
+
     # main2("HJB")  # Y0 ~ 4.59, loss ~ 2e-2
-    main2("AllenCahn")  # Y0 ~ 5.3e-2, loss ~ 6e-5
+    # main2("AllenCahn")  # Y0 ~ 5.3e-2, loss ~ 6e-5
+    main2("PricingOption")  # Y0 ~ 2.13e+01, lss ~ 3.3e+1
