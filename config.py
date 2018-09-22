@@ -1,6 +1,7 @@
 import numpy as np
 
 
+# Config class specifies the NN parameters
 # main reference:
 #    [1] https://arxiv.org/abs/1706.04702
 #    [2] https://arxiv.org/abs/1707.02568
@@ -13,7 +14,7 @@ class Config(object):
     num_iterations = 6000
     logging_frequency = 100
     verbose = True
-    y_init_range = [0, 1]
+    y_init_range = [0, 1]  # TODO maybe this belongs to Equation class?
 
     # to be defined by children
     # https://www.tensorflow.org/api_docs/python/tf/train/piecewise_constant
@@ -71,12 +72,12 @@ class PricingDefaultRiskConfig(Config):
 
 
 class BurgesTypeConfig(Config):
-    dim = 50
+    dim = 50  # (60), page 20 of [1]
     total_time = 0.2
     num_time_interval = 30
     lr_values = list(np.array([1e-2, 1e-3, 1e-4]))
     lr_boundaries = [15000, 25000]
-    num_iterations = 30000
+    num_iterations = 30000  # this takes a long time, 2000 seconds
     num_hiddens = [dim, dim+10, dim+10, dim]
     y_init_range = [2, 4]
 

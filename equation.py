@@ -6,6 +6,9 @@ from scipy.stats import multivariate_normal as normal
 xrange = range  # 2.0 migrated to 3.0
 
 
+# main reference:
+#    [1] https://arxiv.org/abs/1706.04702
+#    [2] https://arxiv.org/abs/1707.02568
 class Equation(object):
     """Base class for defining PDE related function."""
 
@@ -61,7 +64,7 @@ class Equation(object):
 
     def x_sample_bm(self, num_sample, dw_sample):
         # X(t) = vectorize(self._x_init)
-        # X(t+1) = X(t) + simga * dW(t), see Section 5.4 of [1]
+        # X(t+1) = X(t) + sigma * dW(t), see Section 5.4 of [1]
         x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
         x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
         for i in xrange(self._num_time_interval):
@@ -127,6 +130,7 @@ class PricingOption(Equation):
         dw_sample = self.dw_sample_normal(num_sample)
 
         # (52) of [1], gbm, X(t+1) = e^(sigma dW(t) + drift) * X(t)
+        # drift = (mu - sigma^2/2) dt
         x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
         x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
         drift = (self._mu_bar-(self._sigma**2)/2) * self._delta_t
@@ -160,9 +164,10 @@ class PricingDefaultRisk(Equation):
         self._slope = (self._gammah - self._gammal) / (self._vh - self._vl)
 
     def sample(self, num_sample):
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
+        dw_sample = self.dw_sample_normal(num_sample)
+
+        # TODO: the following needs a reference?
+        # it seems to be X(t+1) = (1+ mu*dt + sigma dW(t)) X(t)
         x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
         x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
         for i in xrange(self._num_time_interval):
@@ -182,31 +187,26 @@ class PricingDefaultRisk(Equation):
 class BurgesType(Equation):
     def __init__(self, dim, total_time, num_time_interval):
         super(BurgesType, self).__init__(dim, total_time, num_time_interval)
-        self._x_init = np.zeros(self._dim)
-        self._y_init = 1 - 1.0 / (1 + np.exp(0 + np.sum(self._x_init) / self._dim))
-        self._sigma = self._dim + 0.0
+        self._y_init = 1 - 1.0 / (1 + np.exp(0 + np.sum(self._x_init) / self._dim))  # (61), page 21 of [1]
+        self._sigma = self._dim * 1.0 # this is different from what's in page 20 of [1]
+        # self._sigma = self._dim / np.sqrt(2.0) # changed from d to d/sqrt(2) to match what's in page 20 of [1]
 
     def sample(self, num_sample):
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
-        x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
-        x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
-        for i in xrange(self._num_time_interval):
-            x_sample[:, :, i + 1] = x_sample[:, :, i] + self._sigma * dw_sample[:, :, i]
-        return dw_sample, x_sample
+        return self.sample_bm_normal(num_sample)
 
-    def f_tf(self, t, x, y, z):
-        return (y - (2 + self._dim) / 2.0 / self._dim) * tf.reduce_sum(z, 1, keepdims=True)
+    def f_tf(self, t, x, y, z):  # (57) in Section 4.3 of [1]
+        return (y - (2 + self._dim) / 2.0 / self._dim) * rsum(z)
 
-    def g_tf(self, t, x):
-        return 1 - 1.0 / (1 + tf.exp(t + tf.reduce_sum(x, 1, keepdims=True) / self._dim))
+    def g_tf(self, t, x):  # (58) in Section 4.3 of [1], and 1-1/(1+X) = X/(1+X)
+        return 1 - 1.0 / (1 + tf.exp(t + rsum(x) / self._dim))
 
 
 class QuadraticGradients(Equation):
+    # Section 4.6 of [1]
     def __init__(self, dim, total_time, num_time_interval):
         super(QuadraticGradients, self).__init__(dim, total_time, num_time_interval)
         self._alpha = 0.4
+        self._sigma = 1.0  # added by slihn
         self._x_init = np.zeros(self._dim)
         base = self._total_time + np.sum(np.square(self._x_init) / self._dim)
         self._y_init = np.sin(np.power(base, self._alpha))
@@ -218,10 +218,10 @@ class QuadraticGradients(Equation):
         x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
         x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
         for i in xrange(self._num_time_interval):
-            x_sample[:, :, i + 1] = x_sample[:, :, i] + dw_sample[:, :, i]
+            x_sample[:, :, i + 1] = x_sample[:, :, i] + dw_sample[:, :, i]  # implicit sigma=1
         return dw_sample, x_sample
 
-    def f_tf(self, t, x, y, z):
+    def f_tf(self, t, x, y, z):  # (75), Section 4.6 in [1]
         x_square = tf.reduce_sum(tf.square(x), 1, keepdims=True)
         base = self._total_time - t + x_square / self._dim
         base_alpha = tf.pow(base, self._alpha)
@@ -238,14 +238,16 @@ class QuadraticGradients(Equation):
             )
         return term1 + term2 + term3 + term4
 
-    def g_tf(self, t, x):
+    def g_tf(self, t, x):  # above (75), Section 4.6 in [1]
         return tf.sin(
             tf.pow(tf.reduce_sum(tf.square(x), 1, keepdims=True) / self._dim, self._alpha))
 
 
 class ReactionDiffusion(Equation):
+    # Section 4.7 of [1]
     def __init__(self, dim, total_time, num_time_interval):
         super(ReactionDiffusion, self).__init__(dim, total_time, num_time_interval)
+        self._sigma = 1.0  # added by slihn
         self._kappa = 0.6
         self._lambda = 1 / np.sqrt(self._dim)
         self._x_init = np.zeros(self._dim)

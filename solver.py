@@ -33,7 +33,7 @@ class FeedForwardModel(object):
         # ops for statistics update of batch normalization
         self._extra_train_ops = []
 
-        # model.build()
+        # Below are set up by build()
         self._dw = None
         self._x = None
         self._is_training = None

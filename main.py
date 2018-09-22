@@ -75,4 +75,11 @@ if __name__ == '__main__':
 
     # main2("HJB")  # Y0 ~ 4.59, loss ~ 2e-2
     # main2("AllenCahn")  # Y0 ~ 5.3e-2, loss ~ 6e-5
-    main2("PricingOption")  # Y0 ~ 2.13e+01, lss ~ 3.3e+1
+    # main2("PricingOption")  # Y0 ~ 2.13e+01, lss ~ 3.3e+1
+    # main2("PricingDefaultRisk")  # Y0 ~ 5.7e+01, loss: 2.6e+1
+
+    main2("BurgesType")
+    # if sigma=d/sqrt(2), Y0: 5.2e-1 , loss: 1.3e-3, Y0_true = 0.5, 3.9% error
+    # if sigma=d, Y0: 4.98e-1 , loss: 2.7e-3, Y0_true = 0.5, 0.32% error
+
+
