@@ -78,8 +78,12 @@ if __name__ == '__main__':
     # main2("PricingOption")  # Y0 ~ 2.13e+01, lss ~ 3.3e+1
     # main2("PricingDefaultRisk")  # Y0 ~ 5.7e+01, loss: 2.6e+1
 
-    main2("BurgesType")
+    # main2("BurgesType")
     # if sigma=d/sqrt(2), Y0: 5.2e-1 , loss: 1.3e-3, Y0_true = 0.5, 3.9% error
     # if sigma=d, Y0: 4.98e-1 , loss: 2.7e-3, Y0_true = 0.5, 0.32% error
+
+    # main2("QuadraticGradients")  # Y0: 8.41e-1, loss: 1.38e-3, Y0_true: 8.4147e-1, 0.03% error
+    main2("ReactionDiffusion")  # Y0: 1.601, loss: 1e-3, Y0_true: 1.6, 0.09% error
+
 
 

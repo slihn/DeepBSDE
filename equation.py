@@ -209,24 +209,18 @@ class QuadraticGradients(Equation):
         self._sigma = 1.0  # added by slihn
         self._x_init = np.zeros(self._dim)
         base = self._total_time + np.sum(np.square(self._x_init) / self._dim)
-        self._y_init = np.sin(np.power(base, self._alpha))
+        self._y_init = np.sin(np.power(base, self._alpha))  # this is just sin(1) = 0.84147
 
     def sample(self, num_sample):
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
-        x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
-        x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
-        for i in xrange(self._num_time_interval):
-            x_sample[:, :, i + 1] = x_sample[:, :, i] + dw_sample[:, :, i]  # implicit sigma=1
-        return dw_sample, x_sample
+        return self.sample_bm_normal(num_sample)
 
     def f_tf(self, t, x, y, z):  # (75), Section 4.6 in [1]
-        x_square = tf.reduce_sum(tf.square(x), 1, keepdims=True)
+        x_square = rsum(tf.square(x))
         base = self._total_time - t + x_square / self._dim
         base_alpha = tf.pow(base, self._alpha)
         derivative = self._alpha * tf.pow(base, self._alpha - 1) * tf.cos(base_alpha)
-        term1 = tf.reduce_sum(tf.square(z), 1, keepdims=True)
+
+        term1 = rsum(tf.square(z))
         term2 = -4.0 * (derivative ** 2) * x_square / (self._dim ** 2)
         term3 = derivative
         term4 = -0.5 * (
@@ -238,9 +232,8 @@ class QuadraticGradients(Equation):
             )
         return term1 + term2 + term3 + term4
 
-    def g_tf(self, t, x):  # above (75), Section 4.6 in [1]
-        return tf.sin(
-            tf.pow(tf.reduce_sum(tf.square(x), 1, keepdims=True) / self._dim, self._alpha))
+    def g_tf(self, t, x):  # g(x) above (75), Section 4.6 in [1]
+        return tf.sin(tf.pow(rsum(tf.square(x)) / self._dim, self._alpha))
 
 
 class ReactionDiffusion(Equation):
@@ -251,25 +244,20 @@ class ReactionDiffusion(Equation):
         self._kappa = 0.6
         self._lambda = 1 / np.sqrt(self._dim)
         self._x_init = np.zeros(self._dim)
-        self._y_init = 1 + self._kappa + np.sin(self._lambda * np.sum(self._x_init)) * np.exp(
-            -self._lambda * self._lambda * self._dim * self._total_time / 2)
+
+        exp_term = np.exp(-(self._lambda ** 2) * self._dim * self._total_time / 2)
+        sin_term = np.sin(self._lambda * np.sum(self._x_init))
+        self._y_init = 1 + self._kappa + sin_term * exp_term  # from (79)
 
     def sample(self, num_sample):
-        dw_sample = normal.rvs(size=[num_sample,
-                                     self._dim,
-                                     self._num_time_interval]) * self._sqrt_delta_t
-        x_sample = np.zeros([num_sample, self._dim, self._num_time_interval + 1])
-        x_sample[:, :, 0] = np.ones([num_sample, self._dim]) * self._x_init
-        for i in xrange(self._num_time_interval):
-            x_sample[:, :, i + 1] = x_sample[:, :, i] + dw_sample[:, :, i]
-        return dw_sample, x_sample
+        return self.sample_bm_normal(num_sample)
 
-    def f_tf(self, t, x, y, z):
+    def f_tf(self, t, x, y, z):  # (77) on page 25 of [1]
         exp_term = tf.exp((self._lambda ** 2) * self._dim * (t - self._total_time) / 2)
-        sin_term = tf.sin(self._lambda * tf.reduce_sum(x, 1, keepdims=True))
-        temp = y - self._kappa - 1 - sin_term * exp_term
-        return tf.minimum(tf.constant(1.0, dtype=tf.float64), tf.square(temp))
+        sin_term = tf.sin(self._lambda * rsum(x))
+        f_tf2 = tf.square(y - self._kappa - 1 - sin_term * exp_term)
+        return tf.minimum(tf.constant(1.0, dtype=tf.float64), f_tf2)
 
-    def g_tf(self, t, x):
-        return 1 + self._kappa + tf.sin(self._lambda * tf.reduce_sum(x, 1, keepdims=True))
+    def g_tf(self, t, x):  # page 25 of [1]
+        return 1 + self._kappa + tf.sin(self._lambda * rsum(x))
 
