@@ -220,6 +220,7 @@ class QuadraticGradients(Equation):
         base_alpha = tf.pow(base, self._alpha)
         derivative = self._alpha * tf.pow(base, self._alpha - 1) * tf.cos(base_alpha)
 
+        # TODO the following needs a reference
         term1 = rsum(tf.square(z))
         term2 = -4.0 * (derivative ** 2) * x_square / (self._dim ** 2)
         term3 = derivative
