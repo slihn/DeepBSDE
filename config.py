@@ -7,8 +7,8 @@ import numpy as np
 #    [2] https://arxiv.org/abs/1707.02568
 class Config(object):
     n_layer = 4  # see page 10-11 of [1]
-    batch_size = 64  # num_sample, this is j in page 10 of [1]
-    valid_size = 256  # num_sample
+    batch_size = 64  # this is j in page 10 of [1]
+    valid_size = 256  # why is this much bigger?
 
     step_boundaries = [2000, 4000]
     num_iterations = 6000

@@ -73,7 +73,7 @@ def main2(problem_name=OptDef.problem_name, num_run=OptDef.num_run, log_dir=OptD
 if __name__ == '__main__':
     # main()
 
-    # main2("HJB")  # Y0 ~ 4.59, loss ~ 2e-2
+    main2("HJB")  # Y0 ~ 4.59, loss ~ 2e-2, Y0_true = 4.5901, 0.11% error
     # main2("AllenCahn")  # Y0 ~ 5.3e-2, loss ~ 6e-5
     # main2("PricingOption")  # Y0 ~ 2.13e+01, lss ~ 3.3e+1
     # main2("PricingDefaultRisk")  # Y0 ~ 5.7e+01, loss: 2.6e+1
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     # if sigma=d, Y0: 4.98e-1 , loss: 2.7e-3, Y0_true = 0.5, 0.32% error
 
     # main2("QuadraticGradients")  # Y0: 8.41e-1, loss: 1.38e-3, Y0_true: 8.4147e-1, 0.03% error
-    main2("ReactionDiffusion")  # Y0: 1.601, loss: 1e-3, Y0_true: 1.6, 0.09% error
+    # main2("ReactionDiffusion")  # Y0: 1.601, loss: 1e-3, Y0_true: 1.6, 0.09% error
 
 
 

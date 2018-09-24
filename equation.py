@@ -3,7 +3,8 @@ import tensorflow as tf
 from scipy.stats import multivariate_normal as normal
 
 
-xrange = range  # 2.0 migrated to 3.0
+TF_DTYPE = tf.float64
+xrange = range  # python 2.0 migrated to 3.0
 
 
 # main reference:
@@ -105,6 +106,7 @@ class AllenCahn(Equation):
 class HJB(Equation):
     def __init__(self, dim, total_time, num_time_interval):
         super(HJB, self).__init__(dim, total_time, num_time_interval)
+        self._y_init = 4.5901
 
     def sample(self, batch_size):
         return self.sample_bm_normal(batch_size)
@@ -257,7 +259,7 @@ class ReactionDiffusion(Equation):
         exp_term = tf.exp((self._lambda ** 2) * self._dim * (t - self._total_time) / 2)
         sin_term = tf.sin(self._lambda * rsum(x))
         f_tf2 = tf.square(y - self._kappa - 1 - sin_term * exp_term)
-        return tf.minimum(tf.constant(1.0, dtype=tf.float64), f_tf2)
+        return tf.minimum(tf.constant(1.0, dtype=TF_DTYPE), f_tf2)
 
     def g_tf(self, t, x):  # page 25 of [1]
         return 1 + self._kappa + tf.sin(self._lambda * rsum(x))
